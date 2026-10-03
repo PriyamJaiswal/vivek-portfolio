@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { m, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import ProjectCard from "@/components/project-card";
@@ -12,8 +12,6 @@ interface ProjectGridProps {
   initialProjects: VideoProject[];
 }
 
-const VIDEOS_PER_VIEW = 6;
-
 export default function ProjectGrid({
   initialCategories = [],
   initialProjects,
@@ -21,6 +19,22 @@ export default function ProjectGrid({
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [currentPage, setCurrentPage] = useState(0);
   const [direction, setDirection] = useState(1);
+
+  // Responsive items per view: 3 on mobile (<768px), 6 on laptop/desktop
+  const [videosPerView, setVideosPerView] = useState(6);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setVideosPerView(3);
+      } else {
+        setVideosPerView(6);
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const filteredProjects = useMemo(() => {
     if (selectedCategory === "All") return initialProjects;
@@ -35,8 +49,8 @@ export default function ProjectGrid({
     );
   }, [selectedCategory, initialProjects]);
 
-  const hasMultiplePages = filteredProjects.length > VIDEOS_PER_VIEW;
-  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / VIDEOS_PER_VIEW));
+  const hasMultiplePages = filteredProjects.length > videosPerView;
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / videosPerView));
   const safePage = currentPage >= totalPages ? 0 : currentPage;
 
   const handleNextPage = () => {
@@ -53,8 +67,31 @@ export default function ProjectGrid({
     }
   };
 
-  const currentSliceStart = safePage * VIDEOS_PER_VIEW;
-  const currentSliceEnd = Math.min(currentSliceStart + VIDEOS_PER_VIEW, filteredProjects.length);
+  // Touch Swipe Handling for Mobile Devices
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    if (distance > 40 && safePage < totalPages - 1) {
+      handleNextPage();
+    } else if (distance < -40 && safePage > 0) {
+      handlePrevPage();
+    }
+  };
+
+  const currentSliceStart = safePage * videosPerView;
+  const currentSliceEnd = Math.min(currentSliceStart + videosPerView, filteredProjects.length);
   const displayedProjects = hasMultiplePages
     ? filteredProjects.slice(currentSliceStart, currentSliceEnd)
     : filteredProjects;
@@ -121,7 +158,7 @@ export default function ProjectGrid({
         </m.div>
       )}
 
-      {/* Pagination / Slider Controls Header - shown when > 6 videos exist */}
+      {/* Pagination / Slider Controls Header - shown when items exceed view limit */}
       {hasMultiplePages && (
         <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
           <div className="flex items-center gap-2.5">
@@ -131,12 +168,12 @@ export default function ProjectGrid({
             </span>
             {safePage === 0 && (
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-amber-400/90 font-mono bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/25">
-                Scroll right for more →
+                Swipe / Click next for more →
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <span className="text-xs text-gray-400 font-mono">
               Page {safePage + 1} of {totalPages}
             </span>
@@ -146,7 +183,7 @@ export default function ProjectGrid({
               variant="outline"
               aria-label="Previous videos"
               disabled={safePage === 0}
-              className="w-10 h-10 rounded-full border-white/10 bg-white/5 hover:bg-orange-500/20 hover:border-orange-500/40 text-white disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-all"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-white/10 bg-white/5 hover:bg-orange-500/20 hover:border-orange-500/40 text-white disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-all"
             >
               <ChevronLeft size={18} />
             </Button>
@@ -156,7 +193,7 @@ export default function ProjectGrid({
               variant="outline"
               aria-label="Next videos"
               disabled={safePage === totalPages - 1}
-              className="w-10 h-10 rounded-full border-white/10 bg-white/5 hover:bg-orange-500/20 hover:border-orange-500/40 text-white disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-all shadow-md shadow-orange-950/30"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-white/10 bg-white/5 hover:bg-orange-500/20 hover:border-orange-500/40 text-white disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-all shadow-md shadow-orange-950/30"
             >
               <ChevronRight size={18} />
             </Button>
@@ -164,8 +201,14 @@ export default function ProjectGrid({
         </div>
       )}
 
-      {/* Projects Grid Container with Slide / Drag Animation */}
-      <div className="relative overflow-hidden">
+      {/* Projects Grid Container with Slide Animation & Native Touch Handlers */}
+      <div
+        className="relative overflow-hidden"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{ touchAction: "pan-y" }}
+      >
         <AnimatePresence mode="wait" custom={direction}>
           <m.div
             key={safePage}
@@ -180,9 +223,9 @@ export default function ProjectGrid({
             dragElastic={0.15}
             onDragEnd={(_, info) => {
               if (!hasMultiplePages) return;
-              if (info.offset.x < -50 && safePage < totalPages - 1) {
+              if ((info.offset.x < -40 || info.velocity.x < -200) && safePage < totalPages - 1) {
                 handleNextPage();
-              } else if (info.offset.x > 50 && safePage > 0) {
+              } else if ((info.offset.x > 40 || info.velocity.x > 200) && safePage > 0) {
                 handlePrevPage();
               }
             }}
@@ -204,7 +247,7 @@ export default function ProjectGrid({
 
       {/* Bottom Pagination Dots Indicator */}
       {hasMultiplePages && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-10">
+        <div className="flex items-center justify-center gap-2 mt-8 sm:mt-10">
           {Array.from({ length: totalPages }).map((_, idx) => (
             <button
               key={idx}
