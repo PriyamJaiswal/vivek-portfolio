@@ -85,6 +85,31 @@ export default function ShortsAndReelsSection({
     (safePage + 1) * itemsPerPage
   );
 
+  // Native touch swipe gestures for mobile
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const distance = touchStartX - touchEndX;
+    if (distance > 40) {
+      handleNextPage();
+    } else if (distance < -40) {
+      handlePrevPage();
+    }
+    setTouchStartX(null);
+    setTouchEndX(null);
+  };
+
   const slideVariants = {
     enter: (dir: number) => ({
       x: dir > 0 ? 80 : -80,
@@ -228,7 +253,13 @@ export default function ShortsAndReelsSection({
         </div>
 
         {/* Sliding Page Content with touch swipe support */}
-        <div className="relative min-h-[560px]">
+        <div
+          className="relative min-h-[560px] touch-pan-y select-none"
+          style={{ touchAction: "pan-y" }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           <AnimatePresence custom={direction} mode="wait">
             <m.div
               key={`${selectedFilter}-${safePage}`}
