@@ -82,10 +82,7 @@ export default async function HomePage() {
       {/* 6. Services & Experience Section */}
       <ServicesAndExperienceSection />
 
-      {/* 7. Contact (Let's Work Together) */}
-      <ContactSection />
-
-      {/* 8. Client Reviews (Supabase Screenshots & Feedback, auto-hidden if empty) */}
+      {/* 7. Client Reviews (Supabase Screenshots & Feedback, auto-hidden if empty) */}
       <ClientReviewsSection reviews={allReviews} />
     </div>
   );
